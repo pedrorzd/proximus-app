@@ -1,78 +1,97 @@
-# 🗺️ Proximus: Avaliação Inteligente de Localidade (MVP Acadêmico)
+# Proximus - Avaliador de Localidade 📍
 
-O **Proximus** é um projeto de **MVP (Produto Mínimo Viável)** com foco acadêmico e desenvolvimento de **baixo custo**.
-O objetivo principal é fornecer aos usuários uma ferramenta que permita analisar e pontuar a qualidade de uma determinada localidade com base na proximidade de serviços essenciais como supermercados, escolas e hospitais.
+Proximus é um aplicativo MVP (Produto Mínimo Viável) desenvolvido em Flutter, projetado para avaliar a qualidade de uma localidade com base na sua proximidade a serviços essenciais.
 
-A arquitetura do projeto é baseada em **Flutter** para o desenvolvimento móvel e utiliza a **Google Maps Platform** para dados geográficos e de locais.
+O usuário insere um endereço, e o app calcula uma "Nota de Localidade" de 0 a 10, mostrando em um mapa e em uma lista quais serviços (como supermercados, farmácias, escolas, etc.) estão por perto e a que distância se encontram.
+
+## 🚀 Funcionalidades Principais
+
+* 🗺️ **Busca de Endereço:** Converte qualquer endereço em coordenadas (Geocoding) e centraliza o mapa no local.
+* ⭐ **Nota de Localidade:** Calcula uma pontuação de 0 a 10 com base na proximidade (até 1km) de serviços essenciais.
+* ⚡ **Destaques da Localidade:** Mostra "selos" de destaque (ex: "✔️ Perto de Supermercado") que justificam a nota.
+* 📍 **Pins no Mapa:** Mostra marcadores para o endereço buscado (vermelho) e para os serviços encontrados (laranja).
+* 🔍 **Filtros Interativos:** Permite ao usuário selecionar/desselecionar categorias (supermercado, farmácia, etc.) e refaz a busca automaticamente, atualizando o mapa e a nota.
+* 📊 **Resultados Detalhados:** Apresenta os resultados em uma gaveta interativa (arrastável) com cards estilizados, mostrando o nome, tipo, ícone e distância de cada serviço.
+* 🚀 **Busca Otimizada:** Utiliza chamadas de API paralelas (`Future.wait`) para buscar todos os serviços simultaneamente, tornando a resposta quase instantânea.
+
+## 🛠️ Tecnologias Utilizadas
+
+* **Flutter (Dart)** - Framework principal para o desenvolvimento
+* **Google Maps Platform**
+   * **Geocoding API:** Para converter endereços em coordenadas.
+   * **Places API:** Para encontrar locais próximos (Nearby Search).
+   * **Maps SDK:** Para exibir o mapa.
+* **Pacotes Flutter:**
+   * `Maps_flutter`: O widget do Google Maps.
+   * `http`: Para fazer as chamadas de API.
+   * `geolocator`: Para calcular a distância em linha reta entre dois pontos.
+
+## ⚙️ Configuração e Instalação
+
+Para rodar este projeto localmente, você precisará de uma chave de API do Google Cloud. O projeto está configurado para usar a mesma chave em três locais diferentes.
+
+### 1. Pré-requisitos
+
+* Ter o [SDK do Flutter](https://flutter.dev/docs/get-started/install) instalado.
+* Um celular ou emulador Android configurado.
+* Um projeto no [Google Cloud Console](https://console.cloud.google.com/).
+
+### 2. Configuração das APIs do Google
+
+1.  No seu projeto do Google Cloud, vá até a **Biblioteca** de APIs.
+2.  Ative as seguintes APIs:
+   * **Geocoding API**
+   * **Places API**
+   * **Maps SDK for Android**
+   * **(Opcional para Web)** Maps JavaScript API
+3.  Vá em **"Credenciais"**, crie uma **"Chave de API"** e copie-a.
+4.  (Recomendado) Restrinja sua chave para permitir apenas as APIs que você ativou.
+
+### 3. Configuração do Projeto
+
+1.  **Clone o repositório:**
+    ```bash
+    git clone [https://github.com/pedrorzd/proximus-app.git](https://github.com/pedrorzd/proximus-app.git)
+    cd proximus-app
+    ```
+
+2.  **Crie o arquivo de Chave (Dart):**
+   * Na pasta `lib/`, crie um arquivo chamado `api_keys.dart`.
+   * Adicione o seguinte conteúdo a ele, substituindo pela sua chave:
+       ```dart
+       // lib/api_keys.dart
+       const String googleApiKey = 'SUA_CHAVE_DE_API_AQUI';
+       ```
+
+3.  **Configure o Android:**
+   * Abra o arquivo `android/app/src/main/AndroidManifest.xml`.
+   * Encontre a seção `<application>` e cole sua chave onde indicado:
+       ```xml
+       <application ...>
+           ...
+           <meta-data android:name="com.google.android.geo.API_KEY"
+                      android:value="SUA_CHAVE_DE_API_AQUI"/>
+       </application>
+       ```
+   * Certifique-se de que as permissões de localização (que já estão no arquivo) permaneçam lá.
+
+4.  **(Opcional) Configure a Web:**
+   * Abra o arquivo `web/index.html`.
+   * Adicione sua chave no script do Google Maps, dentro da tag `<head>`:
+       ```html
+       <script src="[https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE_DE_API_AQUI&callback=initMap](https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE_DE_API_AQUI&callback=initMap)" async></script>
+       ```
+
+### 4. Instale as Dependências e Rode
+
+1.  **Instale os pacotes:**
+    ```bash
+    flutter pub get
+    ```
+
+2.  **Execute o aplicativo:**
+    ```bash
+    flutter run
+    ```
 
 ---
-
-## ✨ Funcionalidades do MVP
-
-O **Proximus** visa entregar as seguintes funcionalidades básicas:
-
-* **Busca de Endereço**: Recebe um endereço textual do usuário.
-* **Geocodificação**: Converte o endereço em coordenadas geográficas (lat/lng) usando a Google Geocoding API.
-* **Visualização de Mapa**: Exibe um mapa interativo com a localização central marcada.
-* **Busca de Locais Próximos**: Utiliza a Google Places API para encontrar estabelecimentos em categorias essenciais (Supermercados, Padarias, Escolas, Hospitais/Farmácias).
-* **Cálculo de Distância**: Determina a distância e tempo de percurso entre o endereço central e os estabelecimentos encontrados (Distance Matrix API).
-* **Filtros e Visualização**: Permite filtrar os locais por categoria e exibe-os com ícones e cores distintas no mapa e em uma lista.
-* **Nota de Localidade**: Define e exibe uma pontuação (0–10) baseada na proximidade e diversidade dos serviços essenciais.
-
----
-
-## 🛠️ Stack Tecnológico
-
-| Categoria           | Tecnologia            | Uso no Projeto                                                          |
-| ------------------- | --------------------- | ----------------------------------------------------------------------- |
-| **Desenvolvimento** | Flutter (Dart)        | Framework para o desenvolvimento do aplicativo móvel.                   |
-| **Design**          | Figma (Free)          | Criação de mockups e prototipagem das telas.                            |
-| **Backend/Cloud**   | Firebase (Spark Plan) | Autenticação (inicial/opcional) e potencial para banco de dados futuro. |
-| **Geolocalização**  | Google Maps Platform  | Maps SDK, Geocoding API, Places API, Distance Matrix API.               |
-| **Versionamento**   | GitHub                | Controle de versão e hospedagem do código.                              |
-
----
-
-## ⚙️ Setup e Pré-requisitos
-
-Para rodar o projeto localmente, você precisará configurar:
-
-1. **Ambiente Flutter**:
-
-   * Instalar e configurar o Flutter SDK.
-   * Instalar o Android Studio ou outra IDE compatível.
-
-2. **Repositório**:
-
-   * Clonar este repositório do GitHub.
-
-3. **Google Cloud Project**:
-
-   * Criar um novo projeto.
-
-   * Ativar as APIs: *Maps SDK for Android/iOS*, *Geocoding API*, *Places API* e *Distance Matrix API*.
-
-   * Obter a **API Key** (chave essencial para o Flutter).
-
-   > 💡 Nota: utilizar os **créditos gratuitos ($200 USD)** para cobrir o uso das APIs.
-
-4. **Firebase Project**:
-
-   * Configuração básica de um projeto no plano gratuito *Spark*.
-
-5. **Configuração da API Key no Flutter**:
-
-   * A **Google API Key** deve ser armazenada com segurança no projeto.
-   * Geralmente em arquivos de configuração específicos da plataforma (ex.: `AndroidManifest.xml` no Android).
-
----
-
-## 🎓 Observação Acadêmica
-
-Este projeto é desenvolvido com a premissa de **Custo Zero**, utilizando exclusivamente os **free tiers** de todos os serviços:
-
-* Firebase Spark
-* Créditos iniciais do Google Cloud
-* Ferramentas gratuitas como Figma e GitHub
-
-📌 A entrega final será o **APK funcionando em um dispositivo**, não sendo necessária a publicação nas lojas de aplicativos (*Play Store* / *App Store*).
