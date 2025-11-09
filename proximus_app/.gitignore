@@ -33,6 +33,8 @@ migrate_working_dir/
 /build/
 /coverage/
 /lib/api_keys.dart
+/android/app/src/main/AndroidManifest.xml
+
 # Symbolication related
 app.*.symbols
 
