@@ -5,13 +5,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'api_keys.dart';
 
-// MODIFICADO: Classe PlaceInfo agora guarda as coordenadas do local
+// Classe PlaceInfo (sem mudança)
 class PlaceInfo {
   final String name;
   final String type;
   final double distanceInMeters;
-  final double lat; // Latitude do local encontrado
-  final double lng; // Longitude do local encontrado
+  final double lat;
+  final double lng;
 
   PlaceInfo({
     required this.name,
@@ -34,12 +34,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // --- (Variáveis de estado não mudam) ---
+  // --- (Variáveis de estado) ---
   final TextEditingController _addressController = TextEditingController();
   GoogleMapController? _mapController;
   static const CameraPosition _initialCameraPosition = CameraPosition(
-    target: LatLng(-23.55052, -46.633308),
-    zoom: 12,
+    target: LatLng(-19.9191248, -43.9386291),
+    zoom: 15,
   );
   final Set<Marker> _markers = {};
   final List<PlaceInfo> _nearbyPlacesList = [];
@@ -60,6 +60,58 @@ class _HomeScreenState extends State<HomeScreen> {
     'bakery': true,
   };
 
+  // NOVO: Variáveis para guardar os ícones
+  BitmapDescriptor? _mainPinIcon;
+  BitmapDescriptor? _otherPinIcon;
+  bool _iconsLoaded = false;
+  // --- Fim das Variáveis de Estado ---
+
+
+  // NOVO: Carrega os ícones na inicialização
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_iconsLoaded) {
+      _loadCustomIcons();
+      _iconsLoaded = true;
+    }
+  }
+
+  // NOVO: Função de carregamento SEGURA com try...catch
+  Future<void> _loadCustomIcons() async {
+    final ImageConfiguration config = createLocalImageConfiguration(context, size: const Size(32, 32));
+
+    BitmapDescriptor mainPin;
+    BitmapDescriptor otherPin;
+
+    try {
+      // Tenta carregar os pins customizados
+      // *** VERIFIQUE SE OS NOMES DOS ARQUIVOS ESTÃO CORRETOS AQUI ***
+      mainPin = await BitmapDescriptor.fromAssetImage(config, 'assets/pin_main.png');
+      otherPin = await BitmapDescriptor.fromAssetImage(config, 'assets/pin_other.png');
+
+      print("INFO: Ícones personalizados carregados com sucesso!");
+
+    } catch (e) {
+      // Se falhar (ex: arquivo não encontrado), usa os padrões
+      print("================================================================");
+      print("AVISO: Falha ao carregar ícones da pasta 'assets/'.");
+      print("Usando ícones de fallback (vermelho e azul).");
+      print("Verifique se 'assets/' está no pubspec.yaml e os nomes dos arquivos estão corretos.");
+      print("Erro: $e");
+      print("================================================================");
+      mainPin = BitmapDescriptor.defaultMarker; // Padrão (vermelho)
+      otherPin = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure); // Azul (fallback)
+    }
+
+    // Salva os ícones nas variáveis de estado
+    setState(() {
+      _mainPinIcon = mainPin;
+      _otherPinIcon = otherPin;
+    });
+  }
+
+
   // --- (Funções de UI _onMapCreated, _goToPlace, _formatPlaceType, _getIconForPlaceType não mudam) ---
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
@@ -73,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   String _formatPlaceType(String type) {
     switch (type) {
-      case 'supermarket': return 'Supermercado';
+      case 'supermarket': return 'Mercado';
       case 'pharmacy': return 'Farmácia';
       case 'hospital': return 'Hospital';
       case 'school': return 'Escola';
@@ -91,10 +143,12 @@ class _HomeScreenState extends State<HomeScreen> {
       default: return Icons.place;
     }
   }
+  // --- Fim das Funções de UI ---
 
-  // MODIFICADO: Função agora NÃO mexe em 'tempMarkers'
-  // Ela apenas encontra o local e retorna o objeto PlaceInfo completo
+
+  // --- (Função _fetchClosestPlace não muda) ---
   Future<PlaceInfo?> _fetchClosestPlace(double lat, double lng, String placeType) async {
+    // ... (lógica interna idêntica à anterior)
     const double radius = 1500;
     final Uri url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=$lat,$lng&radius=$radius&type=$placeType&key=$googleApiKey');
@@ -120,8 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
             final placeLocation = closestPlace['geometry']['location'];
             final double placeLat = placeLocation['lat'];
             final double placeLng = placeLocation['lng'];
-
-            // Retorna o objeto PlaceInfo completo
             return PlaceInfo(
               name: name,
               type: placeType,
@@ -140,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- (Função _calculateLocationScore não muda) ---
   Map<String, dynamic> _calculateLocationScore(List<PlaceInfo> places) {
+    // ... (lógica interna idêntica à anterior)
     double score = 0.0;
     List<String> highlights = [];
     const double proximityThreshold = 1000.0;
@@ -166,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return {'score': score, 'highlights': highlights};
   }
 
-  // MODIFICADO: Função agora faz buscas em PARALELO
+  // MODIFICADO: Usa os ícones carregados
   Future<void> _performNearbySearch() async {
     if (_lastSearchedLat == null || _lastSearchedLng == null) return;
 
@@ -180,16 +233,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     final Set<Marker> tempMarkers = {};
-    final List<PlaceInfo> tempList = [];
 
-    // 1. Adiciona o marcador principal (do endereço)
+    // 1. Usa o ícone principal (ou o fallback)
     tempMarkers.add(Marker(
       markerId: const MarkerId('searched_location'),
       position: LatLng(_lastSearchedLat!, _lastSearchedLng!),
       infoWindow: InfoWindow(title: 'Localização Encontrada', snippet: _addressController.text),
+      icon: _mainPinIcon ?? BitmapDescriptor.defaultMarker,
     ));
 
-    // 2. Cria a lista de serviços a serem buscados
     final List<String> selectedServices = [];
     _essentialServices.forEach((service, isSelected) {
       if (isSelected) {
@@ -197,26 +249,20 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     });
 
-    // 3. (NOVO) Prepara a lista de "Futuros" (chamadas de API)
     final List<Future<PlaceInfo?>> searchFutures = [];
-
     for (String service in selectedServices) {
-      // Adiciona a chamada de API à lista, SEM 'await'
       searchFutures.add(
           _fetchClosestPlace(_lastSearchedLat!, _lastSearchedLng!, service)
       );
     }
 
-    // 4. (NOVO) Executa TODAS as buscas em paralelo e espera por elas
     final List<PlaceInfo?> results = await Future.wait(searchFutures);
 
-    // 5. (NOVO) Processa os resultados que voltaram
     for (final placeInfo in results) {
       if (placeInfo != null) {
-        // Adiciona o resultado à lista da UI
-        tempList.add(placeInfo);
+        _nearbyPlacesList.add(placeInfo);
 
-        // Adiciona o marcador para este local
+        // 2. Usa o ícone "other" (ou o fallback)
         tempMarkers.add(
           Marker(
             markerId: MarkerId('marker_${placeInfo.type}'),
@@ -225,21 +271,18 @@ class _HomeScreenState extends State<HomeScreen> {
               title: placeInfo.name,
               snippet: '${_formatPlaceType(placeInfo.type)} (${placeInfo.distanceString})',
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+            icon: _otherPinIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           ),
         );
       }
     }
 
-    // 6. Calcula a nota (como antes)
-    final Map<String, dynamic> scoreResult = _calculateLocationScore(tempList);
+    final Map<String, dynamic> scoreResult = _calculateLocationScore(_nearbyPlacesList);
     final double score = scoreResult['score'];
     final List<String> highlights = scoreResult['highlights'];
 
-    // 7. Atualiza a tela UMA VEZ com todos os dados
     setState(() {
       _markers.addAll(tempMarkers);
-      _nearbyPlacesList.addAll(tempList);
       _locationScore = score;
       _locationHighlights.addAll(highlights);
       _isLoading = false;
@@ -275,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _lastSearchedLat = location['lat'];
           _lastSearchedLng = location['lng'];
           _goToPlace(_lastSearchedLat!, _lastSearchedLng!);
-          await _performNearbySearch(); // Chama a função paralela
+          await _performNearbySearch();
           return;
         }
       }
@@ -289,18 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- (Função _buildFilterChips não muda) ---
-  // MODIFICADO: Widget para construir os chips de filtro (Layout 3-2)
   Widget _buildFilterChips() {
-    // Helper local para criar um chip individual (evita repetição de código)
+    // Helper local para os chips
     Widget buildChip(String serviceKey) {
       return FilterChip(
         label: Text(_formatPlaceType(serviceKey)),
         selected: _essentialServices[serviceKey]!,
-        avatar: Icon(
-          _getIconForPlaceType(serviceKey),
-          size: 18,
-        ),
-        selectedColor: Colors.deepPurple.withOpacity(0.2),
+        avatar: Icon(_getIconForPlaceType(serviceKey), size: 18),
+        selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
         onSelected: (bool selected) {
           setState(() {
             _essentialServices[serviceKey] = selected;
@@ -312,12 +351,21 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // Retorna a estrutura de layout 3-2 centralizada
     return Column(
       children: [
-        // Fileira de Cima (3 filtros)
         Row(
-          mainAxisAlignment: MainAxisAlignment.center, // Centraliza a fileira
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            buildChip('supermarket'),
+            const SizedBox(width: 8.0),
+            buildChip('pharmacy'),
+            const SizedBox(width: 8.0),
+
+          ],
+        ),
+        const SizedBox(height: 4.0),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             buildChip('school'),
             const SizedBox(width: 8.0),
@@ -326,33 +374,31 @@ class _HomeScreenState extends State<HomeScreen> {
             buildChip('hospital'),
           ],
         ),
-        // Espaço entre as fileiras
-        const SizedBox(height: 4.0),
-        // Fileira de Baixo (2 filtros)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center, // Centraliza a fileira
-          children: [
-            buildChip('supermarket'),
-            const SizedBox(width: 8.0),
-            buildChip('pharmacy'),
-          ],
-        ),
       ],
     );
   }
+
   // --- (Método build() da UI não muda) ---
   @override
   Widget build(BuildContext context) {
+    // ... (todo o seu código de UI, DraggableScrollableSheet, etc., permanece o mesmo) ...
+    // ... (copiando e colando o build da versão anterior) ...
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Proximus - Avalie sua Localidade'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(
+          'Proximus',
+          style: theme.appBarTheme.titleTextStyle,
+        ),
       ),
+      backgroundColor: theme.colorScheme.background,
       body: Column(
         children: [
           // PARTE 1: Barra de busca e filtros
-          Padding(
+          Container(
             padding: const EdgeInsets.all(16.0),
+            color: theme.colorScheme.surface,
             child: Column(
               children: [
                 TextField(
@@ -367,6 +413,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 10),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _searchAddress,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                  ),
                   child: _isLoading
                       ? const SizedBox(
                     height: 20,
@@ -398,13 +448,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxChildSize: 0.8,
                     builder: (context, scrollController) {
                       return Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.only(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(20.0),
                             topRight: Radius.circular(20.0),
                           ),
-                          boxShadow: [
+                          boxShadow: const [
                             BoxShadow(
                               blurRadius: 10.0,
                               color: Colors.black26,
@@ -437,12 +487,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   children: [
                                     Text(
                                       'Nota da Localidade (0-10):',
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Colors.black54),
+                                      style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.6)),
                                     ),
                                     Text(
                                       _locationScore?.toStringAsFixed(1) ?? '0.0',
-                                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                        color: Colors.deepPurple,
+                                      style: theme.textTheme.displaySmall?.copyWith(
+                                        color: theme.colorScheme.primary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -455,14 +505,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                         children: _locationHighlights.isNotEmpty
                                             ? _locationHighlights.map((highlight) => Chip(
                                           label: Text(highlight, style: const TextStyle(fontSize: 12)),
-                                          avatar: const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                          backgroundColor: Colors.green.withOpacity(0.1),
+                                          avatar: Icon(Icons.check_circle, color: theme.colorScheme.primary, size: 16),
+                                          backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
                                         )).toList()
                                             : [
                                           Chip(
                                             label: const Text('Nenhum serviço essencial muito próximo', style: TextStyle(fontSize: 12)),
-                                            avatar: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 16),
-                                            backgroundColor: Colors.orange.withOpacity(0.1),
+                                            avatar: Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error, size: 16),
+                                            backgroundColor: theme.colorScheme.error.withOpacity(0.1),
                                           )
                                         ],
                                       ),
@@ -479,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                               child: Text(
                                 'Locais Mais Próximos:',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ),
 
@@ -503,10 +553,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return Card(
                                   margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                                   elevation: 2,
+                                  color: theme.colorScheme.surface,
                                   child: ListTile(
                                     leading: Icon(
                                       _getIconForPlaceType(place.type),
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color: theme.colorScheme.primary,
                                     ),
                                     title: Text(place.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     subtitle: Text(_formatPlaceType(place.type)),
